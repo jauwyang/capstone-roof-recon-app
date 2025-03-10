@@ -1,0 +1,90 @@
+* {
+    border: 1px solid black;  /* 1px solid black border */
+    padding: 5px;             /* Padding inside the widget */
+    /* background-color: rgb(241, 245, 249); */
+
+}
+
+/* QPushButton#Tabs {
+    background-color: rgb(241, 245, 249);
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-weight: bold;
+    color: #64748b;
+}
+
+QPushButton#Tabs:checked {
+    background-color: #ffffff;
+    color: rgb(15, 23, 42);
+}
+
+QHBoxLayout#Tab_Buttons_Block {
+    background-color: rgb(241, 245, 249);
+} */
+
+QTabWidget::pane {
+        border: none;
+        background: none;
+    }
+
+QTabBar::tab {
+    background-color: rgb(241, 245, 249);
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-weight: bold;
+    color: #64748b;
+}
+
+QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: rgb(15, 23, 42);
+
+}
+
+QTabWidget{
+    background-color: rgb(241, 245, 249);
+}
+
+
+
+/* Scrollbar - The entire background track */
+QScrollBar:vertical {
+    border: none;
+    /* background: rgb(230, 230, 230);  Background color of the scrollbar */
+    width: 10px;  /* Width of the scrollbar */
+    margin: 0px 0px 0px 0px; /* Margin around the scrollbar */
+    border-radius: 5px;
+}
+
+/* Scrollbar Handle - The draggable block */
+QScrollBar::handle:vertical {
+    background: rgb(255, 0, 0); /* Color of the handle */
+    min-height: 20px; /* Minimum height */
+    border-radius: 5px;
+}
+
+/* Scrollbar Handle - When hovered */
+QScrollBar::handle:vertical:hover {
+    background: rgb(181, 0, 0); /* Darker shade when hovered */
+}
+
+/* Scrollbar Handle - When pressed */
+QScrollBar::handle:vertical:pressed {
+    background: rgb(197, 54, 54); /* Even darker shade when clicked */
+}
+
+/* Top and Bottom Arrows (Optional - Hide them if not needed) */
+/* QScrollBar::sub-line:vertical, QScrollBar::add-line:vertical {
+    background: none;
+    border: none;
+    height: 0px;
+} */
+
+/* Remove space at the top and bottom of the scrollbar */
+QScrollBar::sub-line:vertical:disabled, 
+QScrollBar::add-line:vertical:disabled {
+    background: none;
+    height: 0px;
+}
