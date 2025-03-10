@@ -1,0 +1,29 @@
+QWidget {
+    background-color: #1E1E1E;
+    color: #EEEEEE;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+QPushButton {
+    background-color: #008CBA;
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-weight: bold;
+    color: white;
+}
+
+QPushButton:hover {
+    background-color: #005f87;
+}
+
+QLabel {
+    border: 2px solid #444;
+    border-radius: 10px;
+    padding: 5px;
+}
+
+QFileDialog {
+    background-color: #2E2E2E;
+}
