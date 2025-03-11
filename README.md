@@ -3,6 +3,7 @@
 ### Create local environment (venv):
 
 * Windows: `python -m venv env`
+* Windows: `py -3.9 -m venv env`
 
 ### Run local environment (venv):
 
