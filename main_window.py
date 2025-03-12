@@ -2,7 +2,7 @@ import os
 from assets.roof_recon_designerqt_ui import Ui_MainWindow
 from imageSetDB import *
 from PyQt6.QtGui import QPixmap, QPen, QColor
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton, QWidget, QScrollArea, QGridLayout, QLabel, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem, QListWidget, QListWidgetItem
+from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton, QWidget, QScrollArea, QGridLayout, QLabel, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QDialog, QListWidget, QListWidgetItem, QVBoxLayout, QProgressBar
 from PyQt6.QtCore import Qt
 from model import RoofDetectionModel
 
@@ -117,9 +117,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Predict Model
         self.detectImageSet = self.detectTab.findChild(QPushButton, "DetectImageSet")
         self.detectImageSet.clicked.connect(self.predictDamages)
+        self.modelProgressBar = self.detectTab.findChild(QProgressBar, "modelProgressBar")
+        self.modelProgressBar.setValue(0)
 
         # Damage Information List
         self.damageInformationList = self.detectTab.findChild(QListWidget, "DamageInformationList")
+
 
         # Tab 2
 
@@ -209,8 +212,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         image_names = [image_query[1] for image_query in image_queries]
 
         print("Starting Predictions...")
-        self.model.predict(self.curr_dir_path, image_names)
+
+        self.modelProgressBar.setMinimum(0)
+        self.modelProgressBar.setMaximum(len(image_names))
+
+        self.model.predict(self.curr_dir_path, image_names, self.modelProgressBar)
+        self.createPredictionPopup()
         print("Finished Predictions!")
+        self.modelProgressBar.setValue(0)
+
 
     def drawBoundingBoxes(self, results):
         for damage in results:
@@ -238,3 +248,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             color = CLASS_INFO[damageType]['color']  # Default to white if class not found
             item.setForeground(QColor(color))  # Step 3: Set text color to match bounding box
             self.damageInformationList.addItem(item)  # Add item to the list
+
+    def createPredictionPopup(self):
+        popup = QDialog()
+        popup.setWindowTitle("Roof Recon")
+        popup.setGeometry(100, 100, 300, 150)
+
+        layout = QVBoxLayout()
+
+        label = QLabel("Completed detection for image set.", popup)
+        layout.addWidget(label)        
+
+        close_button = QPushButton("Ok", popup)
+        close_button.clicked.connect(popup.close)  # Close when clicked
+        layout.addWidget(close_button)
+
+        popup.setLayout(layout)
+        popup.exec()  # Show the popup
