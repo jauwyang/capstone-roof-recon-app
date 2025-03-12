@@ -113,10 +113,10 @@ class RoofDetectionModel:
                 api_key="eyy15gP8oZtUIzN3KfRC"  # Replace with your actual API key
             )
 
-    def predict(self, dir_path, image_names, predictionProgressBar: QProgressBar):
-        i = 1
+    def predict(self, dir_path, image_names, image_ids, predictionProgressBar: QProgressBar):
+        i = 0
         for image_name in image_names:
-            predictionProgressBar.setValue(i)
+            predictionProgressBar.setValue(i+1)
             img_path = os.path.join(dir_path, image_name)
             
             if self.use_local_model:
@@ -141,5 +141,5 @@ class RoofDetectionModel:
                         })
 
             if filtered_predictions:
-                update_image_with_predictions(dir_path, image_name, filtered_predictions)
+                update_image_with_predictions(image_ids[i], filtered_predictions)
             i+=1

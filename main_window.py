@@ -1,8 +1,13 @@
 import os
 from assets.roof_recon_designerqt_ui import Ui_MainWindow
 from imageSetDB import *
-from PyQt6.QtGui import QPixmap, QPen, QColor
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton, QWidget, QScrollArea, QGridLayout, QLabel, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QDialog, QListWidget, QListWidgetItem, QVBoxLayout, QProgressBar
+from PyQt6.QtGui import QPixmap, QPen, QColor, QStandardItemModel, QStandardItem
+from PyQt6.QtWidgets import (
+    QInputDialog, QMainWindow, QFileDialog, QPushButton, QWidget, QScrollArea, 
+    QGridLayout, QLabel, QGraphicsView, QGraphicsScene, QGraphicsRectItem, 
+    QDialog, QListWidget, QListWidgetItem, QVBoxLayout, QProgressBar, QMessageBox,
+    QListView, QAbstractItemView, QTableWidget, QTableWidgetItem
+)
 from PyQt6.QtCore import Qt
 from model import RoofDetectionModel
 
@@ -85,6 +90,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.model = RoofDetectionModel(False)
         self.curr_dir_path = None
+        self.curr_set_id = None
 
         # Tab 1
         self.detectTab = self.findChild(QWidget, "DetectTab")
@@ -105,9 +111,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.filterDamagedImagesButton = self.detectTab.findChild(QPushButton, "DamagedImagesFilterBtn")
         self.filterUndamagedImagesButton = self.detectTab.findChild(QPushButton, "UndamagedImagesFilterBtn")
 
-        self.filterAllImagesButton.clicked.connect(lambda: self._displayImageSet(self.curr_dir_path, "all"))
-        self.filterDamagedImagesButton.clicked.connect(lambda: self._displayImageSet(self.curr_dir_path, "damaged"))
-        self.filterUndamagedImagesButton.clicked.connect(lambda: self._displayImageSet(self.curr_dir_path, "undamaged"))
+        self.filterAllImagesButton.clicked.connect(lambda: self._displayImageSet("all"))
+        self.filterDamagedImagesButton.clicked.connect(lambda: self._displayImageSet("damaged"))
+        self.filterUndamagedImagesButton.clicked.connect(lambda: self._displayImageSet("undamaged"))
 
         # Current Image
         self.currentImageView = self.detectTab.findChild(QGraphicsView, "CurrentImage")
@@ -125,37 +131,126 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
         # Tab 2
+        self.savedImageSetsTab = self.findChild(QWidget, "SavedImageSetsTab")
+        self.loadImageSetButton_tab2 = self.savedImageSetsTab.findChild(QPushButton, "LoadImageSet")
+        self.deleteImageSetButton_tab2 = self.savedImageSetsTab.findChild(QPushButton, "DeleteImageSet")
+
+        self.imageSetTable = self.savedImageSetsTab.findChild(QTableWidget, "ImageSetTable")
+        self.imageSetTable.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.imageSetTable.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.imageSetTable.itemSelectionChanged.connect(self.handleSelectionChange)
+
+        # Load Image Sets in Table
+        self.updateImageSetTable()
+        self.loadImageSetButton_tab2.setEnabled(False)  # Initially disable load button
+        self.loadImageSetButton_tab2.clicked.connect(self.loadPreviousImageSetHandler)
+
+        # Delete Image Sets in Table
+        self.deleteImageSetButton_tab2.setEnabled(False)
+        self.deleteImageSetButton_tab2.clicked.connect(self.deleteSelectedImageSet)
+
+    def deleteSelectedImageSet(self):
+        selected_row = self.imageSetTable.currentRow()
+        
+        if selected_row == -1:
+            QMessageBox.warning(self, "Warning", "Please select an image set to delete.")
+            return
+
+        # Get the Image Set ID from the hidden column
+        set_id = int(self.imageSetTable.item(selected_row, 3).text())
+        set_name = self.imageSetTable.item(selected_row, 0).text()
+
+        # Confirm deletion
+        reply = QMessageBox.question(self, "Confirm Deletion", 
+                                    f"Are you sure you want to delete this image set: {set_name}?",
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Remove from database
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+
+            try:
+                # Delete Predictions
+                cursor.execute("SELECT id FROM images WHERE image_set_id = ?", (set_id,))
+                image_ids = [row[0] for row in cursor.fetchall()]
+                cursor.executemany("DELETE FROM predictions WHERE image_id = ?", [(img_id,) for img_id in image_ids])
+
+                # Delete from images table first (to maintain foreign key constraints)
+                cursor.execute("DELETE FROM images WHERE image_set_id = ?", (set_id,))
+                
+                # Now delete the image set itself
+                cursor.execute("DELETE FROM image_sets WHERE id = ?", (set_id,))
+                
+                conn.commit()
+            except sqlite3.Error as e:
+                QMessageBox.critical(self, "Database Error", f"Failed to delete image set: {e}")
+                conn.rollback()
+            finally:
+                conn.close()
+
+            # Remove from QTableWidget
+            self.imageSetTable.removeRow(selected_row)
+            self.curr_dir_path = None
+            self.curr_set_id = None
+
+        self.updateImageSetTable()  # Refresh table after deleting
+
 
     def loadNewImageSetHandler(self):
         dir_path = self._loadDirectoryHandler()
         if not dir_path:
             return
         
-        self.curr_dir_path = dir_path
+        # Ask the user for a custom dataset name
+        dataset_name, ok = QInputDialog.getText(self, "Roof Recon", "Enter a name/address for this image set:")
+        if not ok or not dataset_name.strip():
+            QMessageBox.warning(self, "Invalid Name", "Dataset name cannot be empty.")
+            return
+        dataset_name = dataset_name.strip()  # Remove spaces
+        self.curr_set_id = add_image_set(dataset_name, dir_path)
         
+
+        self.curr_dir_path = dir_path
         image_names = [f for f in os.listdir(dir_path) if f.endswith(('.png', '.jpg', '.jpeg', '.JPG'))]
         
         # Upload Images to DB under a new dir name (initalize all with no damages)
-        add_images_without_damage(dir_path, image_names)
+        add_images_to_set(self.curr_set_id, dir_path, image_names)  # will always be 0
+        self.updateImageSetTable()
 
         # Load Images
-        self._displayImageSet(dir_path, filter_status="all")
+        self._displayImageSet(filter_status="all")
 
-    def _displayImageSet(self, dir_path, filter_status):
-        if not dir_path:
-            print("No Image Set selected!")
+
+    def loadPreviousImageSetHandler(self):
+        selected_row = self.imageSetTable.currentRow()
+        if selected_row == -1:
+            QMessageBox.warning(self, "Warning", "Please select an image set first.")
             return
 
+        set_id = int(self.imageSetTable.item(selected_row, 3).text())  # Get hidden set_id
+
+        print(f"Loading Image Set ID: {set_id}")
+
+        # Update current set ID and load images
+        self.curr_set_id = set_id
+        self._displayImageSet(filter_status="all")  # Load all images
+
+    def _displayImageSet(self, filter_status):
+        if not self.curr_set_id:
+            print("No Image Set selected!")
+            return
         if filter_status == "all":
-            images = get_all_images_from_dir(dir_path)
+            images = get_all_images_from_set(self.curr_set_id)
         elif filter_status == "damaged":
-            images = get_damaged_images_from_dir(dir_path)
+            images = get_damaged_images_from_set(self.curr_set_id)
         elif filter_status == "undamaged":
-            images = get_no_damage_images_from_dir(dir_path)
+            images = get_no_damage_images_from_set(self.curr_set_id)
         else:
             print("Error with selected filter")
             return
 
+        # print(images)
 
 
         """Displays images inside the scrollable area."""
@@ -166,13 +261,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Populate the grid with images
         row, col = 0, 0
         for image in images:
+            image_id = image[0]
             image_name = image[1]
+            dir_path = image[2]
             image_path = os.path.join(dir_path, image_name)
             label = QLabel()
             pixmap = QPixmap(image_path).scaled(100, 100, Qt.AspectRatioMode.KeepAspectRatio)  # Resize for UI
             label.setPixmap(pixmap)
             self.currentImageSetGrid.addWidget(label, row, col)
-            label.mousePressEvent = lambda event, dir=dir_path, img_name=image_name : self.display_selected_image(dir, img_name)
+            label.mousePressEvent = lambda event, dir=dir_path, img_name=image_name, img_id=image_id : self.display_selected_image(dir, img_name, img_id)
 
             col += 1
             if col > 3:  # 4 images per row
@@ -190,33 +287,36 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         return dir_path
         
-    def display_selected_image(self, dir_path, image_name):
+    def display_selected_image(self, dir_path, image_name, img_id):
         image_path = os.path.join(dir_path, image_name)
         pixmap = QPixmap(image_path)
         self.currentImageScene.clear()  # Remove any existing image
         self.currentImageScene.addPixmap(pixmap)
         self.currentImageView.fitInView(self.currentImageScene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
-        results = get_predictions_for_image(self.curr_dir_path, image_name)
+        results = get_predictions_for_image(img_id)
         
         if len(results) > 0:
             self.drawBoundingBoxes(results)
         self.updateDamageInformationList(results)
 
     def predictDamages(self):
-        if not self.curr_dir_path:
+        if not self.curr_set_id:
             print("No Image Set selected!")
             return
         
-        image_queries = get_all_images_from_dir(self.curr_dir_path)
+        image_queries = get_all_images_from_set(self.curr_set_id)
         image_names = [image_query[1] for image_query in image_queries]
+        image_ids = [image_query[0] for image_query in image_queries]
+        
+        dir_path = image_queries[0][2]
 
         print("Starting Predictions...")
 
         self.modelProgressBar.setMinimum(0)
         self.modelProgressBar.setMaximum(len(image_names))
 
-        self.model.predict(self.curr_dir_path, image_names, self.modelProgressBar)
+        self.model.predict(dir_path, image_names, image_ids, self.modelProgressBar)
         self.createPredictionPopup()
         print("Finished Predictions!")
         self.modelProgressBar.setValue(0)
@@ -265,3 +365,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         popup.setLayout(layout)
         popup.exec()  # Show the popup
+
+
+
+    def updateImageSetTable(self):
+        image_sets = get_all_image_sets()  # Fetch (id, name, directory, timestamp) from DB
+        self.imageSetTable.setRowCount(len(image_sets))
+        self.imageSetTable.setColumnCount(4)  # Extra column for set_id (hidden)
+
+        self.imageSetTable.setHorizontalHeaderLabels(["Name", "Directory", "Timestamp", "ID"])
+        
+        for row, (set_id, name, dir_path, timestamp) in enumerate(image_sets):
+            self.imageSetTable.setItem(row, 0, QTableWidgetItem(name))
+            self.imageSetTable.setItem(row, 1, QTableWidgetItem(dir_path))
+            self.imageSetTable.setItem(row, 2, QTableWidgetItem(timestamp))
+            
+            id_item = QTableWidgetItem(str(set_id))
+            id_item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # Prevent editing
+            self.imageSetTable.setItem(row, 3, id_item)
+
+        # Hide the ID column (column index 3)
+        self.imageSetTable.setColumnHidden(3, True)
+
+
+    def handleSelectionChange(self):
+        selected_row = self.imageSetTable.currentRow()
+        self.loadImageSetButton_tab2.setEnabled(selected_row != -1)  # Enable if a row is selected
+        self.deleteImageSetButton_tab2.setEnabled(selected_row != -1)
