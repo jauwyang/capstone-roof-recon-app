@@ -30,10 +30,6 @@ class Ui_MainWindow(object):
         self.DetectTab.setObjectName("DetectTab")
         self.gridLayout = QtWidgets.QGridLayout(self.DetectTab)
         self.gridLayout.setObjectName("gridLayout")
-        self.ToggleDetectionsButton = QtWidgets.QPushButton(parent=self.DetectTab)
-        self.ToggleDetectionsButton.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.ToggleDetectionsButton.setObjectName("ToggleDetectionsButton")
-        self.gridLayout.addWidget(self.ToggleDetectionsButton, 0, 1, 1, 1)
         self.frame_2 = QtWidgets.QFrame(parent=self.DetectTab)
         self.frame_2.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.frame_2.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
@@ -150,7 +146,6 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Roof Recon"))
-        self.ToggleDetectionsButton.setText(_translate("MainWindow", "Toggle Detections"))
         self.AllImagesFilterBtn.setText(_translate("MainWindow", "Show All"))
         self.DamagedImagesFilterBtn.setText(_translate("MainWindow", "Show Only Damages"))
         self.UndamagedImagesFilterBtn.setText(_translate("MainWindow", "Show No Damages"))

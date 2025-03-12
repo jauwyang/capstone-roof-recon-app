@@ -194,7 +194,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.curr_dir_path = None
             self.curr_set_id = None
 
-        self.updateImageSetTable()  # Refresh table after deleting
+            self.updateImageSetTable()  # Refresh table after deleting
+
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("Roof Recon")
+            msg_box.setText("Successfully deleted image set. Please load a new one to proceed")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
 
 
     def loadNewImageSetHandler(self):
@@ -239,6 +246,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _displayImageSet(self, filter_status):
         if not self.curr_set_id:
             print("No Image Set selected!")
+            self.displayWarningNoImageSetLoadedMessage()
             return
         if filter_status == "all":
             images = get_all_images_from_set(self.curr_set_id)
@@ -303,6 +311,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def predictDamages(self):
         if not self.curr_set_id:
             print("No Image Set selected!")
+            self.displayWarningNoImageSetLoadedMessage()
             return
         
         image_queries = get_all_images_from_set(self.curr_set_id)
@@ -392,3 +401,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         selected_row = self.imageSetTable.currentRow()
         self.loadImageSetButton_tab2.setEnabled(selected_row != -1)  # Enable if a row is selected
         self.deleteImageSetButton_tab2.setEnabled(selected_row != -1)
+
+    def displayWarningNoImageSetLoadedMessage(self):
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle("Roof Recon")
+        msg_box.setText("An image set has not been selected. Please load an image set to perform this action.")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
