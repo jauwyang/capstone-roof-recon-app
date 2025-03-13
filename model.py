@@ -9,7 +9,8 @@ import urllib3
 from imageSetDB import *
 
 
-CONFIDENCE_THRESH = 0.25
+# CONFIDENCE_THRESH = 0.25
+CONFIDENCE_THRESH = 0.15
 
 class RoofDetectionModel:
     def __init__(self, use_local_model = False):

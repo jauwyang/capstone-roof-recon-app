@@ -1,12 +1,12 @@
 import os
 from assets.roof_recon_designerqt_ui import Ui_MainWindow
 from imageSetDB import *
-from PyQt6.QtGui import QPixmap, QPen, QColor, QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QPixmap, QPen, QColor, QStandardItemModel, QStandardItem, QFont, QPainterPath, QBrush
 from PyQt6.QtWidgets import (
     QInputDialog, QMainWindow, QFileDialog, QPushButton, QWidget, QScrollArea, 
     QGridLayout, QLabel, QGraphicsView, QGraphicsScene, QGraphicsRectItem, 
     QDialog, QListWidget, QListWidgetItem, QVBoxLayout, QProgressBar, QMessageBox,
-    QListView, QAbstractItemView, QTableWidget, QTableWidgetItem
+    QListView, QAbstractItemView, QTableWidget, QTableWidgetItem, QGraphicsTextItem, QGraphicsPixmapItem
 )
 from PyQt6.QtCore import Qt
 from model import RoofDetectionModel
@@ -14,7 +14,7 @@ from model import RoofDetectionModel
 
 CLASS_INFO = {
     "Degranulation": {
-        "name": "Degranulation",
+        "name": "🟥 Degranulation",
         "color": QColor("red"),
         "details": [
             "Potential Causes: Aging, UV exposure, poor ventilation, or foot traffic",
@@ -28,7 +28,7 @@ CLASS_INFO = {
         ],
     },
     "Puncture": {
-        "name": "Puncture",
+        "name": "🟩 Puncture",
         "color": QColor("green"),
         "details": [
             "Potential Causes: Fallen debris, improper installation, foot traffic, or animal activity",
@@ -38,7 +38,7 @@ CLASS_INFO = {
         ],
     },
     "Hail Impac": {
-        "name": "Hail Impact",
+        "name": "🟦 Hail Impact",
         "color": QColor("blue"),
         "details": [
             "Potential Causes: Severe storms with hailstones 1”+ in diameter",
@@ -51,7 +51,7 @@ CLASS_INFO = {
         ],
     },
     "Cracked Shingle": {
-        "name": "Cracked Shingle",
+        "name": "🟧 Cracked Shingle",
         "color": QColor("orange"),
         "details": [
             "Potential Causes: Thermal expansion/contraction, impact damage, or poor installation",
@@ -63,7 +63,7 @@ CLASS_INFO = {
         ],
     },
     "Chipped Shingle": {
-        "name": "Chipped Shingle",
+        "name": "🟪 Chipped Shingle",
         "color": QColor("purple"),
         "details": [
             "Potential Causes: Wind uplift, falling debris, aging, or impact stress",
@@ -119,6 +119,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.currentImageView = self.detectTab.findChild(QGraphicsView, "CurrentImage")
         self.currentImageScene = QGraphicsScene()
         self.currentImageView.setScene(self.currentImageScene)
+        self.currentImageView.wheelEvent = self.zoomEvent
+        # Enable panning (dragging) when the left mouse button is held
+        self.currentImageView.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
         # Predict Model
         self.detectImageSet = self.detectTab.findChild(QPushButton, "DetectImageSet")
@@ -203,6 +206,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
 
+
+    def zoomEvent(self, event):
+        zoom_factor = 1.15  # Scale factor per step
+        if event.angleDelta().y() > 0:  # Scroll up (zoom in)
+            self.currentImageView.scale(zoom_factor, zoom_factor)
+        else:  # Scroll down (zoom out)
+            self.currentImageView.scale(1 / zoom_factor, 1 / zoom_factor)
 
     def loadNewImageSetHandler(self):
         dir_path = self._loadDirectoryHandler()
@@ -298,15 +308,40 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def display_selected_image(self, dir_path, image_name, img_id):
         image_path = os.path.join(dir_path, image_name)
         pixmap = QPixmap(image_path)
-        self.currentImageScene.clear()  # Remove any existing image
-        self.currentImageScene.addPixmap(pixmap)
+
+        if pixmap.isNull():
+            print(f"Error: Unable to load image {image_path}")
+            return
+        
+        # Get original image size
+        img_width = pixmap.width()
+        img_height = pixmap.height()
+        
+        # Set a consistent display size (e.g., max 800x800)
+        target_size = 800
+        scale_factor = min(target_size / img_width, target_size / img_height)
+
+        # Scale image while keeping aspect ratio
+        new_width = int(img_width * scale_factor)
+        new_height = int(img_height * scale_factor)
+        scaled_pixmap = pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio)
+
+        self.currentImageScene.clear()  # Remove existing image
+        self.currentImageScene.addPixmap(scaled_pixmap)
+
+        # Fit the image within the view
         self.currentImageView.fitInView(self.currentImageScene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
+        # Get bounding box predictions
         results = get_predictions_for_image(img_id)
-        
-        if len(results) > 0:
-            self.drawBoundingBoxes(results)
+
+        # Scale bounding boxes to match resized image
+        if results:
+            self.drawBoundingBoxes(results, new_width, new_height, scale_factor)
+
+        # Update other UI elements
         self.updateDamageInformationList(results)
+
 
     def predictDamages(self):
         if not self.curr_set_id:
@@ -331,15 +366,50 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.modelProgressBar.setValue(0)
 
 
-    def drawBoundingBoxes(self, results):
+    def drawBoundingBoxes(self, results, img_width, img_height, scale_factor):
         for damage in results:
             x, y, w, h, confidence, label, uuid = damage
+
+            # Scale bounding box coordinates
+            x *= scale_factor
+            y *= scale_factor
+            w *= scale_factor
+            h *= scale_factor
+
             class_colour = CLASS_INFO[label]['color']
-            
+            r, g, b, _ = class_colour.getRgb()
+            class_colour_background = QColor(r, g, b, 150)
+
             # Create a bounding box rectangle
-            rect = QGraphicsRectItem(x-w/2, y-h/2, w, h)
-            rect.setPen(QPen(class_colour, 4))  # Red border for bounding box
+            rect = QGraphicsRectItem(x - w / 2, y - h / 2, w, h)
+            rect.setPen(QPen(class_colour, 4))  # Border in class color
             self.currentImageScene.addItem(rect)
+
+            # Font settings
+            base_font_ratio = 0.03  # Font is 3% of image height
+            fontSize = max(10, min(24, int(img_height * base_font_ratio)))  
+            confidence_text = f"{confidence:.2f}"
+
+            # Create text label
+            text_item = QGraphicsTextItem(confidence_text)
+            text_item.setFont(QFont("Arial", fontSize, QFont.Weight.Bold))
+            text_item.setDefaultTextColor(QColor("white"))
+
+            # Calculate text position slightly above the bounding box
+            text_x = x - w / 2
+            text_y = y - h / 2 - (fontSize * 1.7)
+            text_item.setPos(text_x, text_y)
+
+            # Background for better visibility
+            text_width = text_item.boundingRect().width() - 3
+            text_height = text_item.boundingRect().height() - 6
+            background_rect = QGraphicsRectItem(text_x, text_y, text_width, text_height)
+            background_rect.setBrush(QBrush(class_colour_background))
+            background_rect.setPen(QPen(Qt.GlobalColor.transparent))
+
+            # Ensure background is behind the text
+            self.currentImageScene.addItem(background_rect)
+            self.currentImageScene.addItem(text_item)
 
 
     def updateDamageInformationList(self, results):
@@ -354,8 +424,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             details = CLASS_INFO[damageType]['details']
             formatted_text = f"{defect}\n" + "\n".join([f"   • {point}" for point in details])
             item = QListWidgetItem(formatted_text)  # Create a new QListWidgetItem
-            color = CLASS_INFO[damageType]['color']  # Default to white if class not found
-            item.setForeground(QColor(color))  # Step 3: Set text color to match bounding box
+            # color = CLASS_INFO[damageType]['color']  # Default to white if class not found
+            item.setForeground(QColor("white"))  # Step 3: Set text color to match bounding box
             self.damageInformationList.addItem(item)  # Add item to the list
 
     def createPredictionPopup(self):

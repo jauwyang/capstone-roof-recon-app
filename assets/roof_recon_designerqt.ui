@@ -14,8 +14,8 @@
    <string>Roof Recon</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2">
-    <item>
+   <layout class="QGridLayout" name="gridLayout_2">
+    <item row="0" column="0">
      <widget class="QTabWidget" name="tabWidget">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -234,10 +234,29 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="UserGuideTab">
+      <widget class="QWidget" name="SurfaceReconstructionTab">
        <attribute name="title">
-        <string>User Guide</string>
+        <string>Surface Reconstruction View</string>
        </attribute>
+       <layout class="QGridLayout" name="gridLayout_4">
+        <item row="0" column="0">
+         <widget class="QPushButton" name="ComputeSurfaceMapButton">
+          <property name="text">
+           <string>Compute Surface Map</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QProgressBar" name="SurfaceMapProgressBar">
+          <property name="value">
+           <number>0</number>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0" colspan="2">
+         <widget class="QGraphicsView" name="mapReconstructionGraphic"/>
+        </item>
+       </layout>
       </widget>
      </widget>
     </item>
